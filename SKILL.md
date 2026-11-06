@@ -3,23 +3,25 @@ name: android-privacy-guard
 description: >-
   Audit, explain, remediate, and verify Android/HyperOS/MIUI/OEM privacy and telemetry
   leakage (carrier DM probes, 72-hour behavior profile databases, XSOF cross-app risk
-  interfaces, cloud antivirus scanners, and OneTrack/MSA telemetry) via Root or ADB.
-  Use this skill when the user wants to detect phone/tablet privacy leaks, block
-  system telemetry or anti-fraud profiling, or verify privacy hardening across reboots
-  without causing app crashes, breaking VPNs, or exposing Root hiding.
+  interfaces, cloud antivirus scanners, HTMLViewer cloud-control host telemetry, and
+  OneTrack/MSA telemetry) via Root or ADB. Use this skill when the user wants to detect
+  phone/tablet privacy leaks, block system telemetry or anti-fraud profiling, or verify
+  privacy hardening across reboots without causing app crashes, breaking cloud control
+  or system updates, breaking VPNs, or exposing Root hiding.
 ---
 
-# Android Privacy Guard (Audit, Beginner-Friendly Conservative Remediation & Reboot Verification)
+# Android Privacy Guard (Audit, Conservative Remediation & Reboot Verification)
 
 This skill guides you through a rigorous **3-Step Workflow** to detect, explain, remediate, and verify system-level privacy and telemetry leakage on Android devices (especially Xiaomi HyperOS/MIUI, and generalizable to OPPO ColorOS, vivo OriginOS, Honor MagicOS, and other China ROMs).
 
 > [!IMPORTANT]
 > **Core Safety Principles (Must Follow at All Times)**
 > 1. **Privacy Redaction**: Never log or persist the user's personal identifiers (IMEI, IMSI, ICCID, phone number MD5, GPS coordinates, Wi-Fi SSID/BSSID, or device serial) into shared notes or skill files.
-> 2. **Beginner-Friendly Communication**: Always explain findings and technical mechanisms to the user in plain, accessible everyday language before executing changes.
+> 2. **Clear & Objective Communication**: Always explain findings and technical mechanisms to the user in clear, objective natural language without exaggerated metaphors before executing changes.
 > 3. **Conservative Zero-Crash Architecture**:
->    - **Never** uninstall or disable core system packages (`com.miui.securitycenter`, `com.miui.securitycore`, `com.xiaomi.xmsf`, `com.xiaomi.finddevice`) to prevent bootloops ("卡米").
->    - **Never** lock SQLite databases with `chmod 000` or `chattr +i` on 0-byte files (which throws `SQLiteCantOpenDatabaseException`), and **never** `pm disable` cross-app providers like `XSOFProvider` (which can throw `IllegalArgumentException: Unknown authority`). Instead, use the **SQLite `RAISE(IGNORE)` Trigger Blackhole + Provider Shell** pattern.
+>    - **Never** uninstall or disable core system packages (`com.miui.securitycenter`, `com.miui.securitycore`, `com.xiaomi.xmsf`, `com.xiaomi.finddevice`, `com.android.htmlviewer`) to prevent bootloops, settings failures, or cloud-control loss.
+>    - **Never** delete `/data/data/com.android.htmlviewer/databases/cloud_all_data.db` or `/data/user_de/0/com.android.htmlviewer/databases/cloud_all_data.db` (which stores system-wide cloud control configurations via `SettingsCloudControlService`). Only revoke its identifier permissions (`READ_PHONE_STATE` and `READ_DEVICE_IDENTIFIERS`) and remove its OneTrack/MiPush telemetry files.
+>    - **Never** lock SQLite databases with `chmod 000` or `chattr +i` on 0-byte files (which throws `SQLiteCantOpenDatabaseException`), and **never** `pm disable` cross-app providers like `XSOFProvider` (which can throw `IllegalArgumentException: Unknown authority`). Instead, use the **SQLite `RAISE(IGNORE)` Trigger + Provider Shell** pattern.
 > 4. **Zero Root-Hiding Footprint**: Never bind-mount `/system/etc/hosts` or modify read-only system partitions so `/proc/mounts` and `/proc/self/mountinfo` stay 100% clean for `Zygisk Next` / `Shamiko`.
 > 5. **100% VPN Compatibility**: Never alter `ip rule`, `ip route`, `fwmark`, or `nat`/`mangle` tables. Constrain domain string matching to DNS port `53` and TCP ports `80,443,8080,18080` (`--to 350`).
 > 6. **Full Reversibility**: Always create a pre-execution backup and ensure 1-click rollback via [`scripts/rollback_privacy_guard.sh`](./scripts/rollback_privacy_guard.sh).
@@ -29,7 +31,7 @@ This skill guides you through a rigorous **3-Step Workflow** to detect, explain,
 ## Step 1: Detect Privacy Leakage & Consult Reference Memo
 
 1. **Read the Cross-Brand Leakage Reference Memo**:
-   - Before running the audit, read [`references/leakage_reference_memo.md`](./references/leakage_reference_memo.md) to understand all known telemetry interfaces, background daemons, local databases, cross-app risk permissions, and domain purposes (including which domains **must NOT be blocked** to preserve NFC access cards and 110/120 emergency call location).
+   - Before running the audit, read [`references/leakage_reference_memo.md`](./references/leakage_reference_memo.md) to understand all known telemetry interfaces, background daemons, local databases, cross-app risk permissions, dual-purpose system hosts (`com.android.htmlviewer`), and domain purposes (including which domains **must NOT be blocked** to preserve NFC access cards and 110/120 emergency call location).
 2. **Determine Connection & Privilege Level**:
    - Check connected devices (`adb devices -l`) and check whether the shell has Root access (`adb shell "su -c id"`).
 3. **Run the Automated Read-Only Audit**:
@@ -39,32 +41,34 @@ This skill guides you through a rigorous **3-Step Workflow** to detect, explain,
      adb shell "sh /data/local/tmp/audit_privacy_leaks.sh"
      ```
    - If Root is available and `/data/local/tmp/audit_fd_copy.db` was extracted, inspect its table row counts and triggers using Python (`sqlite3`).
-4. **Present Findings to the User (Beginner-Friendly)**:
-   - Summarize what was found on their device in plain language:
+4. **Present Findings to the User**:
+   - Summarize what was found on their device in clear, natural language:
      - Which background probes/processes are running and how often they wake up the hardware.
      - Whether the local 72-hour behavior database (`fraud_detection_data.db`) exists and what types of records (screenshots, screen recordings, call MD5s, installed apps) are inside.
      - Which installed third-party commercial apps hold the `ACCESS_XSOF` permission to query that profile.
+     - Whether `com.android.htmlviewer` (`HTML查看器`) is running `com.android.htmlviewer:remote`, whether it has invoked `READ_PHONE_STATE` / `READ_DEVICE_IDENTIFIERS`, and what OneTrack/MiPush telemetry files exist alongside `cloud_all_data.db`.
      - Whether telemetry traffic has been bypassing or penetrating their VPN tunnel (`type=17 / TYPE_VPN`).
 
 ---
 
 ## Step 2: Formulate & Explain the Conservative Solution (Root vs. ADB)
 
-Based on the user's permission level (**Root** vs. **Standard ADB**), present a clear, conservative remediation plan and **wait for user confirmation before executing**.
+Based on the user's permission level (**Root** vs. **Standard ADB**), present a clear, conservative remediation plan in plain natural language and **wait for user confirmation before executing**.
 
-### How to Explain the Solution to a Non-Technical User ("小白友好解释")
+### Key Technical Explanations to Share with the User
 
-Use simple, reassuring explanations when presenting the plan:
-- **Why apps won't crash ("魔法吞字笔记本" 原理)**:
-  - *"Instead of deleting the system's behavior logbook or locking its drawer (which could make the Security Center panic and crash when it tries to write), we empty the logbook and install a built-in 'silent shredder' (`SQLite Trigger`) inside it. Whenever the system tries to record a screenshot, call, or app install, the database replies 'Saved successfully!' while immediately tossing the data into a blackhole. And when shopping or payment apps ask the system 'Is this phone risky?', the system calmly replies '0 records, completely safe!' — so neither the system nor your apps ever crash."*
-- **Why VPNs (`FlClash`, etc.) won't break ("只拦特定信封，不动快递专线" 原理)**:
-  - *"Your VPN works like a private express tunnel. Our firewall doesn't touch the tunnel's routing map at all. It simply stands at the doorway and blocks packets sent by specific telemetry apps (by their ID) or addressed to 11 specific data-collection servers. Your normal web browsing and proxy nodes pass through with zero delay."*
-- **Why Root hiding (`Zygisk Next`) isn't affected ("不贴封条，不留痕迹" 原理)**:
-  - *"Many traditional ad-blockers replace system files (`hosts`), which leaves a visible mount record that banking or detection apps can spot. Our firewall runs purely in kernel memory and stores its startup script inside KernelSU's private vault (`/data/adb/`), leaving zero footprint on the system partition."*
+- **Why third-party apps won't crash**:
+  - Instead of deleting `fraud_detection_data.db` or setting its permissions to `000` (which causes `SQLiteCantOpenDatabaseException` and retry loops), we empty the 8 tables, run `VACUUM`, and install `BEFORE INSERT` / `BEFORE UPDATE` SQLite triggers (`SELECT RAISE(IGNORE);`). Write requests are silently ignored without error, and when third-party apps query `XSOFProvider`, it returns `0` rows normally.
+- **Why system updates and cloud control won't break (`com.android.htmlviewer`)**:
+  - On HyperOS/MIUI, `com.android.htmlviewer` (`HTML查看器`) hosts `SettingsCloudControlService` and `SettingsProvider` (`cloud_all_data.db`) as well as Settings search indexing (`global_search_result_database`). We keep the package enabled and preserve `cloud_all_data.db`, while revoking its `READ_PHONE_STATE` and `READ_DEVICE_IDENTIFIERS` AppOps permissions and deleting only its OneTrack databases (`onetrack_cache`, `universal_ot_monitor_db`), MiPush performance logs (`files/perf/`), and WebView origin logs.
+- **Why VPNs (`FlClash`, etc.) won't break**:
+  - The firewall creates an isolated `PRIVACY_GUARD` chain in `iptables`/`ip6tables` `OUTPUT` without flushing existing chains or modifying `ip rule` / `ip route` / `tun0` routing tables. It blocks traffic only by target telemetry UID or by matching the 11 telemetry domains on DNS (`53`) and HTTP/HTTPS (`80,443,8080,18080`).
+- **Why Root hiding (`Zygisk Next`) isn't affected**:
+  - We do not bind-mount `/system/etc/hosts` or modify read-only partitions. All rules run in kernel netfilter memory and persist via `/data/adb/service.d/99_privacy_guard.sh`, leaving zero extra mount entries in `/proc/mounts`.
 - **Why NFC door cards & 110/120 emergency calls still work**:
-  - *"We specifically leave the NFC access-card configuration server (`fraud-detection.engine.miui.com`) and the national 110/120 emergency rescue location server (`eps.caict.ac.cn`) unblocked."*
-- **100% Reversible ("随时一键后悔药")**:
-  - *"Before changing anything, we back up your original database and component states. If you ever want to restore everything (for example, to use the built-in cloud virus scanner), a single rollback command restores the device to its exact original state."*
+  - We keep the NFC access-card configuration domain (`fraud-detection.engine.miui.com`) and the national 110/120 emergency rescue location domains (`eps.caict.ac.cn` / `gateway-papa.cloud.weizhi.com`) unblocked.
+- **Full Reversibility**:
+  - Original databases, package states, and settings are backed up before changes are applied, and [`scripts/rollback_privacy_guard.sh`](./scripts/rollback_privacy_guard.sh) restores the initial state in one step.
 
 ### Execution Path A: Root Permission Available (Permanent Root or Temporary Root)
 
@@ -73,6 +77,7 @@ Use simple, reassuring explanations when presenting the plan:
    - Automatically backs up original files and package states to `/data/adb/privacy_guard_backup/`.
    - Deploys the trigger-protected empty `fraud_detection_data.db` and removes leaked copies on `/sdcard/`.
    - Keeps `XSOFProvider` and `FraudDetectionProvider` enabled (returning 0-row clean data) while disabling internal background collectors (`MiFraudDetectionService`, `MiSafetyDetectService`, `GuardService`, `ImageProtectService`, `OperationListCollectService`, `AppPredictService`, `AiService`, `AnalyticsService`).
+   - Cleans `com.android.htmlviewer` telemetry (`onetrack*`, `one_track_cloud*`, `universal_ot_monitor_db*`, `one_track_pref.xml`, `sp_client_report_status.xml`, `AwOriginVisitLoggerPrefs.xml`, `files/perf/*`) across `/data/data/` and `/data/user_de/0/` and revokes `READ_PHONE_STATE` (UID and package level) and `READ_DEVICE_IDENTIFIERS`, while preserving `cloud_all_data.db` and `global_search_result_database`.
    - Wipes telemetry databases and disables/uninstalls carrier probes (`com.mobiletools.systemhelper`, `com.miui.dmregservice`, `com.xiaomi.registration`) and telemetry suites (`com.miui.guardprovider`, `com.xiaomi.security.onetrack`, `com.miui.analytics` in both `User 0` and Dual-Apps `User 999`, `com.miui.systemAdSolution`, `com.bsp.catchlog`, `com.miui.daemon`, `com.miui.bugreport`, `com.miui.uireporter`, `com.miui.misightservice`).
    - Installs the persistent boot script `/data/adb/service.d/99_privacy_guard.sh` and immediately loads the `PRIVACY_GUARD` `iptables`/`ip6tables` + eBPF firewall rules.
 3. **Special Note for Temporary Root (`fastboot boot` patched image / one-time Root)**:

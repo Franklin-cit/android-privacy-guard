@@ -91,6 +91,20 @@ rm -f /data/data/com.miui.securitycenter/databases/onetrack*
 rm -f /data/data/com.miui.securitycenter/databases/universal_ot_monitor_db*
 rm -f /data/data/com.miui.securitycenter/databases/preload.db*
 
+# Clean HTMLViewer (com.android.htmlviewer) OneTrack & MiPush telemetry while keeping cloud_all_data.db and global_search_result_database
+pm revoke --user 0 com.android.htmlviewer android.permission.READ_PHONE_STATE 2>/dev/null
+cmd appops set --user 0 --uid com.android.htmlviewer READ_PHONE_STATE ignore 2>/dev/null
+cmd appops set --user 0 com.android.htmlviewer READ_PHONE_STATE ignore 2>/dev/null
+cmd appops set --user 0 --uid com.android.htmlviewer READ_DEVICE_IDENTIFIERS ignore 2>/dev/null
+cmd appops set --user 0 com.android.htmlviewer READ_DEVICE_IDENTIFIERS ignore 2>/dev/null
+rm -f /data/data/com.android.htmlviewer/databases/onetrack* /data/user_de/0/com.android.htmlviewer/databases/onetrack*
+rm -f /data/data/com.android.htmlviewer/databases/one_track_cloud* /data/user_de/0/com.android.htmlviewer/databases/one_track_cloud*
+rm -f /data/data/com.android.htmlviewer/databases/universal_ot_monitor_db* /data/user_de/0/com.android.htmlviewer/databases/universal_ot_monitor_db*
+rm -f /data/data/com.android.htmlviewer/shared_prefs/one_track_pref.xml /data/user_de/0/com.android.htmlviewer/shared_prefs/one_track_pref.xml
+rm -f /data/data/com.android.htmlviewer/shared_prefs/sp_client_report_status.xml
+rm -f /data/data/com.android.htmlviewer/shared_prefs/AwOriginVisitLoggerPrefs.xml
+rm -rf /data/data/com.android.htmlviewer/files/perf/*
+
 echo "=== [4/7] WIPING PROBE DATABASES & REMOVING TELEMETRY PACKAGES ==="
 rm -rf /data/data/com.mobiletools.systemhelper/databases/* 2>/dev/null
 rm -rf /data/user_de/0/com.mobiletools.systemhelper/databases/* 2>/dev/null
@@ -257,6 +271,19 @@ settings put secure fraud_num_state 0
 settings put global FBO_UPLOAD_LIST "[]"
 settings put secure FBO_UPLOAD_LIST "[]"
 settings put secure lock_unit_mapping "{}"
+
+# 7. Clean HTMLViewer (com.android.htmlviewer) OneTrack & MiPush telemetry while keeping cloud_all_data.db
+cmd appops set --user 0 --uid com.android.htmlviewer READ_PHONE_STATE ignore >/dev/null 2>&1
+cmd appops set --user 0 com.android.htmlviewer READ_PHONE_STATE ignore >/dev/null 2>&1
+cmd appops set --user 0 --uid com.android.htmlviewer READ_DEVICE_IDENTIFIERS ignore >/dev/null 2>&1
+cmd appops set --user 0 com.android.htmlviewer READ_DEVICE_IDENTIFIERS ignore >/dev/null 2>&1
+rm -f /data/data/com.android.htmlviewer/databases/onetrack* /data/user_de/0/com.android.htmlviewer/databases/onetrack*
+rm -f /data/data/com.android.htmlviewer/databases/one_track_cloud* /data/user_de/0/com.android.htmlviewer/databases/one_track_cloud*
+rm -f /data/data/com.android.htmlviewer/databases/universal_ot_monitor_db* /data/user_de/0/com.android.htmlviewer/databases/universal_ot_monitor_db*
+rm -f /data/data/com.android.htmlviewer/shared_prefs/one_track_pref.xml /data/user_de/0/com.android.htmlviewer/shared_prefs/one_track_pref.xml
+rm -f /data/data/com.android.htmlviewer/shared_prefs/sp_client_report_status.xml
+rm -f /data/data/com.android.htmlviewer/shared_prefs/AwOriginVisitLoggerPrefs.xml
+rm -rf /data/data/com.android.htmlviewer/files/perf/*
 EOF
 
 chmod 755 /data/adb/service.d/99_privacy_guard.sh

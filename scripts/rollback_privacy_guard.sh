@@ -97,6 +97,9 @@ for pkg in $TARGET_PKGS; do
     fi
 done
 
+cmd appops set --user 0 --uid com.android.htmlviewer READ_PHONE_STATE allow 2>/dev/null
+cmd appops set --user 0 com.android.htmlviewer READ_PHONE_STATE allow 2>/dev/null
+
 echo "=== [5/5] RESTORING SYSTEM SETTINGS FROM BACKUP ==="
 for bdir in /data/adb/privacy_guard_backup /data/local/tmp/privacy_guard_adb_backup; do
     if [ -f "$bdir/settings_secure.txt" ]; then

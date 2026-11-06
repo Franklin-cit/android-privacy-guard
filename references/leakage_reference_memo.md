@@ -106,7 +106,24 @@
 | **硬件/内核遥测守护** | `com.miui.misightservice` + native `misight` | `com.oplus.nhs` | `com.vivo. PEM` | 包含 Java 层服务与底层 native `misight` 守护进程（需执行 `stop misight`） |
 | **AI 通话防换脸预警** | `com.xiaomi.aiasst.service` / `.vision` | `com.oplus.aicall` | `com.vivo.ai.copilot` | 开启“AI 通话预警”后，在通话期间抓取画面与语音特征送云端 (`detection-aigc.engine.miui.com`) 研判；若用户使用自动接听功能可保留应用并仅在防火墙拦截 AIGC 上报域名 |
 
-### 4. 关键系统设置项 (`settings`) 泄露源
+### 4. 系统云控宿主组件 (`com.android.htmlviewer` / HTML查看器) 的双重角色与遥测剥离
+- **基本定位**：
+  - 安装路径：`/system/priv-app/HTMLViewer/HTMLViewer.apk`
+  - 常驻进程：`com.android.htmlviewer:remote`（手机与平板均常驻后台）
+- **为什么不能直接卸载或冻结该组件（承载的 3 项核心系统功能）**：
+  1. **`SettingsCloudControlService` 与 `SettingsProvider`（全系统云控配置中枢）**：负责从小米云端同步全系统各模块的云控参数（包括系统相机、显示、温控、WebView、安全组件等上万条配置项），并存储在 `/data/data/com.android.htmlviewer/databases/cloud_all_data.db` 或 `/data/user_de/0/com.android.htmlviewer/databases/cloud_all_data.db`（大小通常为 `3.5 MB ~ 4.5 MB`）中，供系统各应用通过 ContentProvider 实时查询。
+  2. **`SearchIndexablesProvider`（系统设置全局搜索索引）**：维护 `global_search_result_database`，为系统“设置”顶部的搜索栏提供索引支持。
+  3. **`FileViewerActivity`（本地 HTML 与法务声明查看器）**：用于打开本地 `.html` 文件及系统设置中的开源许可、认证信息页面。
+- **实机取证发现的附加遥测与权限读取行为**：
+  1. **云控同步时读取电话状态与硬件标识符**：在同步 `cloud_all_data.db` 时，该组件会调用 `READ_PHONE_STATE`（读取电话/网络状态）并尝试调用 `READ_DEVICE_IDENTIFIERS`（读取序列号等硬件标识）。
+  2. **内置 OneTrack 统计与监控数据库**：在 `/data/data/com.android.htmlviewer/databases/` 下生成 `onetrack_cache`、`one_track_cloud`、`universal_ot_monitor_db`，并在 `shared_prefs/` 下生成 `one_track_pref.xml`。
+  3. **内置 MiPush 性能统计与 WebView 访问记录**：在 `files/perf/` 下生成 `1000#P1000000` 性能上报日志，在 `shared_prefs/` 下生成 `sp_client_report_status.xml` 与 `AwOriginVisitLoggerPrefs.xml`。
+- **无损剥离方案**：
+  - **保留主应用与核心数据库**：严禁冻结 `com.android.htmlviewer`，完整保留 `cloud_all_data.db` 与 `global_search_result_database`。
+  - **撤销标识符读取权限**：执行 `cmd appops set --user 0 --uid com.android.htmlviewer READ_PHONE_STATE ignore`、`cmd appops set --user 0 com.android.htmlviewer READ_PHONE_STATE ignore` 及 `READ_DEVICE_IDENTIFIERS ignore`。
+  - **清理遥测文件**：删除 `onetrack*`、`one_track_cloud*`、`universal_ot_monitor_db*`、`one_track_pref.xml`、`sp_client_report_status.xml`、`AwOriginVisitLoggerPrefs.xml` 及 `files/perf/*`。
+
+### 5. 关键系统设置项 (`settings`) 泄露源
 - `secure` / `global` `upload_apk_enable`：`1` 表示开启“上传未知安装包至云端检测”。
 - `secure` `cloud_antispam`：`1` 表示开启云端防骚扰实时查询。
 - `secure` `fraud_num_state` / `fraud_num_state_sim_2`：`1` 表示开启电诈号码云端联动校验。

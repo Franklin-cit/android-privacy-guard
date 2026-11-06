@@ -57,6 +57,13 @@ done
 cmd appops set com.miui.securityadd RUN_IN_BACKGROUND ignore 2>/dev/null
 cmd appops set com.miui.securityadd RUN_ANY_IN_BACKGROUND ignore 2>/dev/null
 
+# Revoke identifier permissions on HTMLViewer while preserving its cloud control service
+pm revoke --user 0 com.android.htmlviewer android.permission.READ_PHONE_STATE 2>/dev/null
+cmd appops set --user 0 --uid com.android.htmlviewer READ_PHONE_STATE ignore 2>/dev/null
+cmd appops set --user 0 com.android.htmlviewer READ_PHONE_STATE ignore 2>/dev/null
+cmd appops set --user 0 --uid com.android.htmlviewer READ_DEVICE_IDENTIFIERS ignore 2>/dev/null
+cmd appops set --user 0 com.android.htmlviewer READ_DEVICE_IDENTIFIERS ignore 2>/dev/null
+
 echo "=== [3/4] HARDENING ACCESSIBLE SYSTEM SETTINGS & CLEANING SDCARD COPIES ==="
 settings put secure upload_apk_enable 0 2>/dev/null
 settings put global upload_apk_enable 0 2>/dev/null
